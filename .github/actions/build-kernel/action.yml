@@ -2063,6 +2063,61 @@ runs:
         
         
         make LD="$COMMON_KERNEL_FOLDER/ld-wrapper" HOSTLD="$COMMON_KERNEL_FOLDER/ld-wrapper" O="$OUT" olddefconfig
+
+        echo "============================================"
+        echo "🔎 Verify final NoMount integration"
+        echo "============================================"
+
+        grep -qx 'CONFIG_NOMOUNT=y' "$OUT/.config" || {
+          echo "::error::CONFIG_NOMOUNT is not enabled in final .config"
+          exit 1
+        }
+
+        test -f fs/nomount.c || {
+          echo "::error::fs/nomount.c missing"
+          exit 1
+        }
+
+        test -f fs/nomount.h || {
+          echo "::error::fs/nomount.h missing"
+          exit 1
+        }
+
+        grep -q 'config NOMOUNT' fs/Kconfig || {
+          echo "::error::NoMount Kconfig entry missing"
+          exit 1
+        }
+
+        grep -q 'nomount.o' fs/Makefile || {
+          echo "::error::NoMount Makefile entry missing"
+          exit 1
+        }
+
+        require_count() {
+          file="$1"
+          token="$2"
+          minimum="$3"
+
+          count=$(grep -Foc "$token" "$file" || true)
+
+          echo "NoMount hook: $file :: $token = $count"
+
+          if [ "$count" -lt "$minimum" ]; then
+            echo "::error::NoMount hook incomplete: $token in $file (found $count, expected >= $minimum)"
+            exit 1
+          fi
+        }
+
+        require_count fs/d_path.c              nomount_handle_dpath          2
+        require_count fs/namei.c               nomount_handle_getname        3
+        require_count fs/namei.c               nomount_handle_permission     3
+        require_count fs/proc/task_mmu.c       nomount_spoof_mmap_metadata  2
+        require_count fs/readdir.c             nomount_handle_iterate_dir    2
+        require_count fs/stat.c                nomount_handle_getattr        2
+        require_count fs/statfs.c              nomount_spoof_statfs          2
+
+        echo "✅ Final NoMount source hooks and CONFIG verified"
+        echo "============================================"
         
         KCFLAGS="$KCFLAGS -Wno-error -pipe ${KCFLAGS_EXTRA}"
         KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
