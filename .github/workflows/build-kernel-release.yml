@@ -1280,3 +1280,5 @@ jobs:
               echo "- \`$name\` (${size_mb} MB)" >> $GITHUB_STEP_SUMMARY
             fi
           done
+
+# Enable workflows in fork
