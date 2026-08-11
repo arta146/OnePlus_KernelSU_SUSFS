@@ -440,6 +440,32 @@ runs:
         fi
         echo "::endgroup::"
 
+    - name: Verify OP13R OOS15 6.1.118 Base
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "Model: $OP_MODEL"
+        echo "OS: $OP_OS_VERSION"
+        echo "Detected kernel: $TKERNEL_VER"
+
+        if [ "$OP_MODEL" != "OP13r" ]; then
+          echo "::error::Unexpected model: $OP_MODEL"
+          exit 1
+        fi
+
+        if [ "$OP_OS_VERSION" != "A15" ]; then
+          echo "::error::Unexpected OS version: $OP_OS_VERSION"
+          exit 1
+        fi
+
+        if [ "$TKERNEL_VER" != "6.1.118" ]; then
+          echo "::error::Kernel source is no longer 6.1.118: $TKERNEL_VER"
+          exit 1
+        fi
+
+        echo "✅ Correct OP13R OxygenOS 15 / Linux 6.1.118 base"
+
     - name: 🏷️ Set Build Identity (Hardcoded)
       shell: bash
       run: |
@@ -1257,6 +1283,48 @@ runs:
         CONFIG_KSU_SUSFS_SUS_SU=n
         EOF
         
+        echo "::endgroup::"
+
+    - name: Integrate Official NoMount
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "::group::Integrate Official NoMount"
+
+        NM_DIR="$GITHUB_WORKSPACE/nomount-src"
+        NM_COMMIT="ec13c264c55c6c3ef7841a5961386ccb5917c1e1"
+
+        echo "Cloning official NoMount..."
+        rm -rf "$NM_DIR"
+        git clone https://github.com/maxsteeel/nomount.git "$NM_DIR"
+        git -C "$NM_DIR" checkout "$NM_COMMIT"
+
+        echo "NoMount commit:"
+        git -C "$NM_DIR" rev-parse HEAD
+
+        cd "$COMMON_KERNEL_FOLDER"
+
+        echo "Checking official Linux 6.1 integration patch..."
+        patch --dry-run -p1 --forward < \
+          "$NM_DIR/kernel/patches/nomount_6.1_kernel_integration.patch"
+
+        echo "Applying official Linux 6.1 integration patch..."
+        patch -p1 --forward < \
+          "$NM_DIR/kernel/patches/nomount_6.1_kernel_integration.patch"
+
+        echo "Copying NoMount kernel sources..."
+        cp -f "$NM_DIR/kernel/src/nomount.c" fs/nomount.c
+        cp -f "$NM_DIR/kernel/src/nomount.h" fs/nomount.h
+
+        test -f fs/nomount.c
+        test -f fs/nomount.h
+        grep -q 'config NOMOUNT' fs/Kconfig
+        grep -q 'nomount.o' fs/Makefile
+
+        echo "CONFIG_NOMOUNT=y" >> \
+          "$COMMON_KERNEL_FOLDER/arch/arm64/configs/gki_defconfig"
+
+        echo "✅ Official NoMount integrated"
         echo "::endgroup::"
 
     - name: Add BBG
