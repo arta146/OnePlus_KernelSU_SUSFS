@@ -175,6 +175,17 @@ jobs:
           esac
           
           filtered=$(jq -c "$jq_filter" matrix.json)
+
+          # Experimental branch: build only OnePlus 13R / OOS15 / android14-6.1
+          filtered=$(echo "$filtered" | jq -c '
+            map(select(
+              .model == "OP13r" and
+              .os_version == "A15" and
+              .android_version == "android14" and
+              .kernel_version == "6.1"
+            ))
+          ')
+
           count=$(jq 'length' <<<"$filtered")
           
           filtered=$(echo "$filtered" | jq '
