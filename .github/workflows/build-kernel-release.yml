@@ -26,6 +26,7 @@ on:
           - android16-6.12
           - android15-6.6
           - android14-6.1
+          - OP13r-A15-6.1.118
           - android13-5.15
           - android12-5.10
         default: A14+15+16
@@ -147,6 +148,9 @@ jobs:
               ;;
             A16)
               jq_filter="map(select(.os_version == \"A16\"))"
+              ;;
+            OP13r-A15-6.1.118)
+              jq_filter='map(select(.model == "OP13r" and .os_version == "A15" and .android_version == "android14" and .kernel_version == "6.1"))'
               ;;
             A15)
               jq_filter="map(select(.os_version == \"A15\"))"
