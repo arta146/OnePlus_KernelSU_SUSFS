@@ -938,6 +938,57 @@ runs:
         echo "✅ KernelSU Next added (commit: ${KSU_COMMIT_SHA:0:8})"
         echo "::endgroup::"
 
+    - name: Apply NoMount (hookless) Patch
+      if: ${{ env.OP_NMS == 'true' }}
+      shell: bash
+      run: |
+        set -eo pipefail
+        echo "::group::Apply NoMount (hookless VFS) patch"
+
+        NM_SRC="$GITHUB_WORKSPACE/nomount_hookless"
+        rm -rf "$NM_SRC"
+
+        git clone --depth 1 -b hookless           https://github.com/Bouteillepleine/kbuild.git           "$NM_SRC"
+
+        NM_PATCH="$NM_SRC/hookless/patches/nomount_${KERNEL_VER}_kernel_integration.patch"
+        DEFCONFIG="$COMMON_KERNEL_FOLDER/arch/arm64/configs/gki_defconfig"
+
+        if [ ! -f "$NM_PATCH" ]; then
+          echo "::error::No hookless NoMount patch for KERNEL_VER=${KERNEL_VER}: $NM_PATCH"
+          exit 1
+        fi
+
+        cd "$COMMON_KERNEL_FOLDER"
+
+        cp -f "$NM_SRC/hookless/src/nomount.c" fs/nomount.c
+        cp -f "$NM_SRC/hookless/src/nomount.h" fs/nomount.h
+
+        patch -p1 --forward --fuzz=3 < "$NM_PATCH"
+
+        mkdir -p "$(dirname "$DEFCONFIG")"
+        touch "$DEFCONFIG"
+        sed -i '/^CONFIG_NOMOUNT=/d' "$DEFCONFIG"
+        echo "CONFIG_NOMOUNT=y" >> "$DEFCONFIG"
+
+        echo "✅ NoMount hookless applied for kernel ${KERNEL_VER}"
+        echo "::endgroup::"
+
+    - name: Record NoMount Version
+      if: ${{ env.OP_NMS == 'true' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        NM_HDR="$COMMON_KERNEL_FOLDER/fs/nomount.h"
+        NMVER=""
+
+        if [ -f "$NM_HDR" ]; then
+          NMVER="$(sed -n 's/^#define[[:space:]]\+NM_MODULE_VERSION[[:space:]]\+"\([^"]*\)".*/\1/p' "$NM_HDR" | head -n1)"
+        fi
+
+        echo "NMVER=${NMVER:-unknown}" >> "$GITHUB_ENV"
+        echo "NoMount version: ${NMVER:-unknown}"
+
     - name: Add KernelSU
       shell: bash
       if: ${{ inputs.ksu_type == 'KSU' }}
