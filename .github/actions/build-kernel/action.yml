@@ -1312,7 +1312,13 @@ runs:
         cp -f "$NM_SRC/hookless/src/nomount.c" fs/nomount.c
         cp -f "$NM_SRC/hookless/src/nomount.h" fs/nomount.h
 
-        patch -p1 --forward --fuzz=1 < "$NM_PATCH"
+        NM_PATCH_NO_TASKMMU="$RUNNER_TEMP/nomount_without_task_mmu.patch"
+
+        awk '/^diff --git / { skip=($0=="diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c") } !skip { print }' "$NM_PATCH" > "$NM_PATCH_NO_TASKMMU"
+
+        patch -p1 --forward --fuzz=1 < "$NM_PATCH_NO_TASKMMU"
+
+        python3 "$GITHUB_ACTION_PATH/merge_nomount_task_mmu.py" fs/proc/task_mmu.c
 
         grep -q 'config NOMOUNT' fs/Kconfig || { echo "::error::NoMount Kconfig edit missing"; exit 1; }
         grep -qF 'obj-$(CONFIG_NOMOUNT) += nomount.o' fs/Makefile || { echo "::error::NoMount Makefile edit missing"; exit 1; }
