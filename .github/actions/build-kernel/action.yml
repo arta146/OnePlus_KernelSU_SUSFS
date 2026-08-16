@@ -1314,9 +1314,9 @@ runs:
 
         patch -p1 --forward --fuzz=1 < "$NM_PATCH"
 
-        grep -q 'config NOMOUNT' fs/Kconfig  { echo "::error::NoMount Kconfig edit missing"; exit 1; }
-        grep -qF 'obj-$(CONFIG_NOMOUNT) += nomount.o' fs/Makefile  { echo "::error::NoMount Makefile edit missing"; exit 1; }
-        grep -q 'nomount_spoof_mmap_metadata' fs/proc/task_mmu.c  { echo "::error::NoMount task_mmu hook missing"; exit 1; }
+        grep -q 'config NOMOUNT' fs/Kconfig || { echo "::error::NoMount Kconfig edit missing"; exit 1; }
+        grep -qF 'obj-$(CONFIG_NOMOUNT) += nomount.o' fs/Makefile || { echo "::error::NoMount Makefile edit missing"; exit 1; }
+        grep -q 'nomount_spoof_mmap_metadata' fs/proc/task_mmu.c || { echo "::error::NoMount task_mmu hook missing"; exit 1; }
 
         mkdir -p "$(dirname "$DEFCONFIG")"
         touch "$DEFCONFIG"
