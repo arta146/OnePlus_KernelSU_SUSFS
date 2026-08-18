@@ -937,20 +937,37 @@ runs:
 
         curl --fail --location --proto '=https' -LSs           "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh"           | bash -s "$KSU_INPUT"
 
-        git submodule update --init --recursive
-        cd KernelSU-Next/kernel
-        
-        git fetch origin dev --quiet || true
-        if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
-          git fetch --unshallow --quiet || true
+        cd KernelSU-Next
+
+        # setup.sh checks out the resolved SHA in detached HEAD.
+        # Reattach the exact SHA as dev-susfs so pershoot Kbuild
+        # calculates the real version against origin/dev.
+        RESOLVED_KSU_SHA=$(git rev-parse HEAD)
+
+        if [ -f .git/shallow ]; then
+          git fetch --unshallow origin --quiet
         fi
 
-        # Match pershoot KernelSU-Next Kbuild version calculation exactly
-        BASE_BRANCH=$(git rev-parse --abbrev-ref HEAD | sed 's:-.*::')
-        BASE_COMMIT=$(git merge-base HEAD "refs/remotes/origin/${BASE_BRANCH}" 2>/dev/null  git merge-base HEAD refs/remotes/origin/main 2>/dev/null  echo HEAD)
+        git fetch origin \
+          "+refs/heads/dev:refs/remotes/origin/dev" \
+          "+refs/heads/dev-susfs:refs/remotes/origin/dev-susfs" \
+          --quiet
+
+        git switch -C dev-susfs "$RESOLVED_KSU_SHA"
+
+        BASE_COMMIT=$(git merge-base HEAD refs/remotes/origin/dev)
         COMMITS_COUNT=$(git rev-list --count "$BASE_COMMIT")
         BASE_VERSION=30000
         KSU_VERSION=$((BASE_VERSION + COMMITS_COUNT))
+
+        echo "KernelSU Next version calculation:"
+        echo "  resolved SHA = $RESOLVED_KSU_SHA"
+        echo "  branch       = $(git branch --show-current)"
+        echo "  base commit  = $BASE_COMMIT"
+        echo "  commits      = $COMMITS_COUNT"
+        echo "  KSU_VERSION  = $KSU_VERSION"
+
+        cd kernel
 
         echo "KernelSU version calculation:"
         echo "  branch      = $BASE_BRANCH"
