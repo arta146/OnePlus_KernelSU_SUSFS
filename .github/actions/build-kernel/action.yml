@@ -941,10 +941,22 @@ runs:
         cd KernelSU-Next/kernel
         
         git fetch origin dev --quiet || true
+        if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+          git fetch --unshallow --quiet || true
+        fi
 
-        COMMITS_COUNT=$(/usr/bin/git rev-list --count origin/dev 2>/dev/null || /usr/bin/git rev-list --count HEAD)
+        # Match pershoot KernelSU-Next Kbuild version calculation exactly
+        BASE_BRANCH=$(git rev-parse --abbrev-ref HEAD | sed 's:-.*::')
+        BASE_COMMIT=$(git merge-base HEAD "refs/remotes/origin/${BASE_BRANCH}" 2>/dev/null  git merge-base HEAD refs/remotes/origin/main 2>/dev/null  echo HEAD)
+        COMMITS_COUNT=$(git rev-list --count "$BASE_COMMIT")
         BASE_VERSION=30000
-        KSU_VERSION=$(expr $COMMITS_COUNT "+" $BASE_VERSION)
+        KSU_VERSION=$((BASE_VERSION + COMMITS_COUNT))
+
+        echo "KernelSU version calculation:"
+        echo "  branch      = $BASE_BRANCH"
+        echo "  base commit = $BASE_COMMIT"
+        echo "  commits     = $COMMITS_COUNT"
+        echo "  version     = $KSU_VERSION"
         
         if [ -f ksu.c ]; then
           sed -i 's/#if defined(CONFIG_STACKPROTECTOR) && (defined(CONFIG_ARM64) && !defined(CONFIG_STACKPROTECTOR_PER_TASK))/#if 0/' ksu.c
