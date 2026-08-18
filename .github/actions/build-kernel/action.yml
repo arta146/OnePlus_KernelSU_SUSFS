@@ -892,6 +892,20 @@ runs:
             exit 1
           fi
           echo "SUSFS_COMMIT_SHA=$SUSFS_BRANCH" >> $GITHUB_ENV
+
+          if [ "${{ inputs.ksu_type }}" = "KSUN" ]; then
+            echo "Applying pershoot SUSFS compatibility patches..."
+
+            cd "$SUSFS_FOLDER"
+
+            patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0001-pershoot-Allow-core-to-be-built-with-no-features.patch"
+
+            patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0002-pershoot-Implement-SuSFS-and-Toolkit-coexistence.patch"
+
+            cd "$GITHUB_WORKSPACE"
+
+            echo "✅ pershoot SUSFS compatibility patches applied"
+          fi
         fi
         echo "✅ Dependencies cloned"
         echo "::endgroup::"
@@ -916,23 +930,21 @@ runs:
         echo "Adding KernelSU Next..."
         KSU_INPUT="${{ inputs.ksu_branch_or_hash }}"
         if [ -z "$KSU_INPUT" ]; then
-          curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -
-        else
-          curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s "$KSU_INPUT"
+          KSU_INPUT="dev-susfs"
         fi
+
+        echo "Using pershoot/KernelSU-Next ref: $KSU_INPUT"
+
+        curl --fail --location --proto '=https' -LSs           "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh"           | bash -s "$KSU_INPUT"
+
         git submodule update --init --recursive
         cd KernelSU-Next/kernel
         
-        COMMITS_COUNT=$(/usr/bin/git rev-list --count HEAD)
-        
-        if [ $COMMITS_COUNT -lt 2684 ]; then
-          BASE_VERSION=10200
-        else
-          BASE_VERSION=30000
-        fi
-        
+        git fetch origin dev --quiet || true
+
+        COMMITS_COUNT=$(/usr/bin/git rev-list --count origin/dev 2>/dev/null || /usr/bin/git rev-list --count HEAD)
+        BASE_VERSION=30000
         KSU_VERSION=$(expr $COMMITS_COUNT "+" $BASE_VERSION)
-        sed -i "s/DKSU_VERSION=11998/DKSU_VERSION=${KSU_VERSION}/" Makefile
         
         if [ -f ksu.c ]; then
           sed -i 's/#if defined(CONFIG_STACKPROTECTOR) && (defined(CONFIG_ARM64) && !defined(CONFIG_STACKPROTECTOR_PER_TASK))/#if 0/' ksu.c
@@ -1123,15 +1135,16 @@ runs:
           "v2.2.0")
             if [ "${{ inputs.ksu_type }}" = "KSUN" ]; then
               cd "$KSUN_FOLDER"
-              patch -p1 --forward < "$SUSFS_FOLDER/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" || true
-              for file in $(find ./kernel -maxdepth 2 -name "*.rej" -exec basename {} .rej \;); do
-                echo "Patching file: $file with fix_$file.patch"
-                patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/next/susfs_fix_patches/$susfs_version/fix_$file.patch"
-              done
-              echo "Patching Hook Mode!"
-              patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/next/susfs_fix_patches/$susfs_version/overwrite_hook_mode.patch"
-              echo "Patching KSU_TOOLKIT Support for SusFS kernel!"
-              patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/next/susfs_fix_patches/$susfs_version/ksu_toolkit.patch"
+
+              echo "KernelSU Next dev-susfs already contains SUSFS integration."
+              echo "Skipping legacy 10_enable_susfs_for_ksu.patch and Wild fix patches."
+
+              grep -q 'CONFIG_KSU_SUSFS' kernel/Kbuild || {
+                echo "::error::SUSFS integration missing from pershoot KernelSU-Next dev-susfs"
+                exit 1
+              }
+
+              echo "✅ KernelSU-side SUSFS integration verified"
             else
               cd "$KSU_FOLDER"
               patch -p1 --forward < "$SUSFS_FOLDER/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" || true
@@ -2587,7 +2600,7 @@ runs:
           
           if [ "$KSU_SHA" != "unknown" ]; then
             if [ "${{ inputs.ksu_type }}" = "KSUN" ]; then
-              echo "| **KSUN Commit** | [\`${KSU_SHA:0:8}\`](https://github.com/KernelSU-Next/KernelSU-Next/commit/$KSU_SHA) |"
+              echo "| **KSUN Commit** | [\`${KSU_SHA:0:8}\`](https://github.com/pershoot/KernelSU-Next/commit/$KSU_SHA) |"
             else
               echo "| **KSU Commit** | [\`${KSU_SHA:0:8}\`](https://github.com/tiann/KernelSU/commit/$KSU_SHA) |"
             fi
