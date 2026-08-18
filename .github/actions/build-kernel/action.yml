@@ -969,11 +969,6 @@ runs:
 
         cd kernel
 
-        echo "KernelSU version calculation:"
-        echo "  branch      = $BASE_BRANCH"
-        echo "  base commit = $BASE_COMMIT"
-        echo "  commits     = $COMMITS_COUNT"
-        echo "  version     = $KSU_VERSION"
         
         if [ -f ksu.c ]; then
           sed -i 's/#if defined(CONFIG_STACKPROTECTOR) && (defined(CONFIG_ARM64) && !defined(CONFIG_STACKPROTECTOR_PER_TASK))/#if 0/' ksu.c
