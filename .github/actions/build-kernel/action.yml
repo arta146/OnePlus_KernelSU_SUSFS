@@ -1414,7 +1414,7 @@ runs:
         set -euo pipefail
         echo "::group::Apply Fresh SELinux Oracle Patches"
 
-        HOOK="$WILDKERNEL_PATCHES_FOLDER/common/_hook"
+        HOOK="$GITHUB_WORKSPACE/bouton_kernel_patches/common/_hook"
         KV="${KERNEL_VER}"
 
         dos2unix "$HOOK"/*.patch 2>/dev/null || true
