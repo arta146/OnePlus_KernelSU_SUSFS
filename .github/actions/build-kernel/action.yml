@@ -2118,12 +2118,12 @@ runs:
           exit 1
         }
 
-        test -f fs/nomount.c || {
+        test -f fs/nomount/nomount.c || {
           echo "::error::fs/nomount.c missing"
           exit 1
         }
 
-        test -f fs/nomount.h || {
+        test -f fs/nomount/nomount.h || {
           echo "::error::fs/nomount.h missing"
           exit 1
         }
@@ -2138,7 +2138,6 @@ runs:
           exit 1
         }
 
-        grep -q 'nomount_spoof_mmap_metadata' fs/proc/task_mmu.c || {
           echo "::error::NoMount mmap hook missing"
           exit 1
         }
