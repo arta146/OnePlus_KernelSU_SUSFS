@@ -881,7 +881,6 @@ runs:
         
         retry_clone "https://github.com/WildKernels/kernel_patches.git" "main" "1"
 
-        rm -rf "$GITHUB_WORKSPACE/bouton_kernel_patches"
         
         if [ "${{ env.OP_SUSFS }}" = true ]; then
           echo "Using SUSFS branch/commit: $SUSFS_BRANCH"
@@ -1406,57 +1405,6 @@ runs:
         cd "$COMMON_KERNEL_FOLDER"
         patch -p1 < "$KERNEL_PATCHES_FOLDER/next/scope_min_manual_hooks_v1.4.patch"
         echo "✅ KSU hooks applied"
-        echo "::endgroup::"
-
-    - name: Apply Fresh SELinux Oracle Patches
-      shell: bash
-      run: |
-        set -euo pipefail
-        echo "::group::Apply Fresh SELinux Oracle Patches"
-
-        HOOK="$GITHUB_WORKSPACE/bouton_kernel_patches/common/_hook"
-        KV="${KERNEL_VER}"
-
-        dos2unix "$HOOK"/*.patch 2>/dev/null || true
-
-        apply_or_die() {
-          local patch_file="$1"
-
-          if [ ! -f "$patch_file" ]; then
-            echo "::error::Missing patch: $patch_file"
-            exit 1
-          fi
-
-          if patch -p1 --forward --dry-run < "$patch_file" >/dev/null 2>&1; then
-            patch -p1 --forward < "$patch_file"
-          elif patch -p1 --reverse --dry-run < "$patch_file" >/dev/null 2>&1; then
-            echo "Already applied: $(basename "$patch_file")"
-          else
-            echo "::error::Cannot apply $(basename "$patch_file")"
-            exit 1
-          fi
-        }
-
-        cd "$COMMON_KERNEL_FOLDER"
-
-        apply_or_die "$HOOK/hide_selinux_selinuxfs.patch"
-
-        if [ "$KV" = "6.12" ]; then
-          apply_or_die "$HOOK/hide_selinux_attr_6_12.patch"
-        else
-          apply_or_die "$HOOK/hide_selinux_attr.patch"
-        fi
-
-        case "$KV" in
-          6.6|6.12) apply_or_die "$HOOK/quiet_selinux_audit.patch" ;;
-          *) apply_or_die "$HOOK/quiet_selinux_audit_legacy.patch" ;;
-        esac
-
-        apply_or_die "$HOOK/quiet_selinux_audit_user.patch"
-
-        cd "$KSUN_FOLDER"
-        apply_or_die "$HOOK/fix_selinux_seqno.patch"
-
         echo "::endgroup::"
 
     - name: Apply Other Patches
