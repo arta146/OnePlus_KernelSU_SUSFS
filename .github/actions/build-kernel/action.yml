@@ -1326,53 +1326,54 @@ runs:
         
         echo "::endgroup::"
 
-    - name: Apply Fresh NoMount Hookless
+    - name: Apply Maxsteel NoMount dev
       shell: bash
       run: |
         set -euo pipefail
-        echo "::group::Apply Fresh NoMount Hookless"
+        echo "::group::Apply Maxsteel NoMount"
 
-        NM_SRC="$GITHUB_WORKSPACE/nomount_hookless"
+        NM_SRC="$GITHUB_WORKSPACE/nomount-maxsteel"
         rm -rf "$NM_SRC"
-        git clone --depth 1 --branch hookless https://github.com/Bouteillepleine/kbuild.git "$NM_SRC"
 
-        NM_PATCH="$NM_SRC/hookless/patches/nomount_${KERNEL_VER}_kernel_integration.patch"
+        git clone \
+          --depth 1 \
+          --single-branch \
+          --branch dev \
+          https://github.com/maxsteeel/nomount.git \
+          "$NM_SRC"
+
         DEFCONFIG="$COMMON_KERNEL_FOLDER/arch/arm64/configs/gki_defconfig"
-
-        if [ ! -f "$NM_PATCH" ]; then
-          echo "::error::No hookless NoMount patch for KERNEL_VER=${KERNEL_VER}"
-          exit 1
-        fi
 
         cd "$COMMON_KERNEL_FOLDER"
 
-        cp -f "$NM_SRC/hookless/src/nomount.c" fs/nomount.c
-        cp -f "$NM_SRC/hookless/src/nomount.h" fs/nomount.h
+        mkdir -p fs/nomount
 
-        NM_PATCH_NO_TASKMMU="$RUNNER_TEMP/nomount_without_task_mmu.patch"
+        cp -f "$NM_SRC/kernel/src/"* fs/nomount/
 
-        awk '/^diff --git / { skip=($0=="diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c") } !skip { print }' "$NM_PATCH" > "$NM_PATCH_NO_TASKMMU"
+        patch -p1 --forward --fuzz=1 < \
+          "$NM_SRC/kernel/patches/nomount_${KERNEL_VER}_kernel_integration.patch"
 
-        patch -p1 --forward --fuzz=1 < "$NM_PATCH_NO_TASKMMU"
+        grep -q 'source "fs/nomount/Kconfig"' fs/Kconfig || {
+          echo "::error::NoMount Kconfig edit missing"
+          exit 1
+        }
 
-        python3 "$GITHUB_ACTION_PATH/merge_nomount_task_mmu.py" fs/proc/task_mmu.c
-
-        grep -q 'config NOMOUNT' fs/Kconfig || { echo "::error::NoMount Kconfig edit missing"; exit 1; }
-        grep -qF 'obj-$(CONFIG_NOMOUNT) += nomount.o' fs/Makefile || { echo "::error::NoMount Makefile edit missing"; exit 1; }
-        grep -q 'nomount_spoof_mmap_metadata' fs/proc/task_mmu.c || { echo "::error::NoMount task_mmu hook missing"; exit 1; }
+        grep -q 'obj-.*CONFIG_NOMOUNT.*nomount/' fs/Makefile || {
+          echo "::error::NoMount Makefile edit missing"
+          exit 1
+        }
 
         mkdir -p "$(dirname "$DEFCONFIG")"
         touch "$DEFCONFIG"
+
         sed -i '/^CONFIG_NOMOUNT=/d' "$DEFCONFIG"
         echo "CONFIG_NOMOUNT=y" >> "$DEFCONFIG"
 
         NM_SHA="$(git -C "$NM_SRC" rev-parse HEAD)"
-        NMVER="$(sed -n 's/^#define[[:space:]]\+NM_MODULE_VERSION[[:space:]]\+"\([^"]*\)".*/\1/p' fs/nomount.h | head -n1)"
 
         echo "NM_SHA=$NM_SHA" >> "$GITHUB_ENV"
-        echo "NMVER=${NMVER:-unknown}" >> "$GITHUB_ENV"
 
-        echo "NoMount: ${NMVER:-unknown} @ ${NM_SHA:0:12}"
+        echo "Maxsteel NoMount @ ${NM_SHA:0:12}"
         echo "::endgroup::"
     - name: Add BBG
       if: ${{ env.OP_BBG == 'true' }}
