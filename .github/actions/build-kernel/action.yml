@@ -882,8 +882,6 @@ runs:
         retry_clone "https://github.com/WildKernels/kernel_patches.git" "main" "1"
 
         rm -rf "$GITHUB_WORKSPACE/bouton_kernel_patches"
-        git clone --depth 1 --branch main https://github.com/Bouteillepleine/kernel_patches.git "$GITHUB_WORKSPACE/bouton_kernel_patches"
-        echo "BOUTEILLE_KERNEL_PATCHES_FOLDER=$GITHUB_WORKSPACE/bouton_kernel_patches" >> "$GITHUB_ENV"
         
         if [ "${{ env.OP_SUSFS }}" = true ]; then
           echo "Using SUSFS branch/commit: $SUSFS_BRANCH"
@@ -1416,7 +1414,7 @@ runs:
         set -euo pipefail
         echo "::group::Apply Fresh SELinux Oracle Patches"
 
-        HOOK="$BOUTEILLE_KERNEL_PATCHES_FOLDER/common/_hook"
+        HOOK="$WILDKERNEL_PATCHES_FOLDER/common/_hook"
         KV="${KERNEL_VER}"
 
         dos2unix "$HOOK"/*.patch 2>/dev/null || true
@@ -1458,48 +1456,6 @@ runs:
 
         cd "$KSUN_FOLDER"
         apply_or_die "$HOOK/fix_selinux_seqno.patch"
-
-        echo "::endgroup::"
-
-    - name: Apply Fresh PathHide
-      shell: bash
-      run: |
-        set -euo pipefail
-        echo "::group::Apply Fresh PathHide"
-
-        PH="$BOUTEILLE_KERNEL_PATCHES_FOLDER/common/_pathhide"
-        KV="${KERNEL_VER}"
-
-        cd "$COMMON_KERNEL_FOLDER"
-
-        cp -f "$PH/pathhide.c" fs/pathhide.c
-        cp -f "$PH/pathhide.h" fs/pathhide.h
-
-        dos2unix fs/pathhide.c fs/pathhide.h "$PH"/*.patch 2>/dev/null || true
-
-        apply_or_die() {
-          local patch_file="$1"
-
-          if [ ! -f "$patch_file" ]; then
-            echo "::error::Missing patch: $patch_file"
-            exit 1
-          fi
-
-          if patch -p1 --forward --dry-run < "$patch_file" >/dev/null 2>&1; then
-            patch -p1 --forward < "$patch_file"
-          elif patch -p1 --reverse --dry-run < "$patch_file" >/dev/null 2>&1; then
-            echo "Already applied: $(basename "$patch_file")"
-          else
-            echo "::error::Cannot apply $(basename "$patch_file")"
-            exit 1
-          fi
-        }
-
-        apply_or_die "$PH/pathhide_${KV}_integration.patch"
-        apply_or_die "$PH/pathhide_mapfiles_${KV}_integration.patch"
-
-        grep -qF 'obj-y += pathhide.o' fs/Makefile || echo 'obj-y += pathhide.o' >> fs/Makefile
-        grep -q 'pathhide' fs/Makefile || { echo "::error::pathhide.o not wired"; exit 1; }
 
         echo "::endgroup::"
 
@@ -2239,37 +2195,10 @@ runs:
           exit 1
         }
 
-        test -f fs/pathhide.c || {
-          echo "::error::fs/pathhide.c missing"
           exit 1
         }
 
-        test -f fs/pathhide.h || {
-          echo "::error::fs/pathhide.h missing"
-          exit 1
-        }
-
-        grep -qF 'obj-y += pathhide.o' fs/Makefile || {
-          echo "::error::pathhide.o not wired"
-          exit 1
-        }
-
-        grep -q 'pathhide_match_file' fs/proc/task_mmu.c || {
-          echo "::error::pathhide maps hook missing"
-          exit 1
-        }
-
-        grep -q 'pathhide_match_file' fs/proc/fd.c || {
-          echo "::error::pathhide fd hook missing"
-          exit 1
-        }
-
-        grep -q 'pathhide_match_file' fs/proc/base.c || {
-          echo "::error::pathhide map_files hook missing"
-          exit 1
-        }
-
-        echo "✅ Fresh NoMount + PathHide integration verified"
+        echo "✅ Fresh NoMount integration verified"
         echo "============================================"
         
         KCFLAGS="$KCFLAGS -Wno-error -pipe ${KCFLAGS_EXTRA}"
