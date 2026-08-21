@@ -1350,12 +1350,12 @@ runs:
         patch -p1 --forward --fuzz=1 < \
           "$NM_SRC/kernel/patches/nomount_${KERNEL_VER}_kernel_integration.patch"
 
-        grep -q 'source "fs/nomount/Kconfig"' fs/Kconfig  {
+        grep -q 'source "fs/nomount/Kconfig"' fs/Kconfig || {
           echo "::error::NoMount Kconfig edit missing"
           exit 1
         }
 
-        grep -q 'obj-.*CONFIG_NOMOUNT.*nomount/' fs/Makefile  {
+        grep -q 'obj-.*CONFIG_NOMOUNT.*nomount/' fs/Makefile || {
           echo "::error::NoMount Makefile edit missing"
           exit 1
         }
@@ -2113,22 +2113,22 @@ runs:
         echo "🔎 Verify final NoMount integration"
         echo "============================================"
 
-        grep -qx 'CONFIG_NOMOUNT=y' "$OUT/.config"  {
+        grep -qx 'CONFIG_NOMOUNT=y' "$OUT/.config" || {
           echo "::error::CONFIG_NOMOUNT is not enabled in final .config"
           exit 1
         }
 
-        test -f fs/nomount/nomount.c  {
+        test -f fs/nomount/nomount.c || {
           echo "::error::fs/nomount.c missing"
           exit 1
         }
 
-        test -f fs/nomount/nomount.h  {
+        test -f fs/nomount/nomount.h || {
           echo "::error::fs/nomount.h missing"
           exit 1
         }
 
-        grep -q 'source "fs/nomount/Kconfig"' fs/Kconfig  {
+        grep -q 'source "fs/nomount/Kconfig"' fs/Kconfig || {
           echo "::error::NoMount Kconfig entry missing"
           exit 1
         }
