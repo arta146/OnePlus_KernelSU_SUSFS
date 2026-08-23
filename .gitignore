@@ -2,6 +2,7 @@
 .env
 .input
 .vscode
+.hmbird-build/
 *.Identifier
 *.orig
 *.rej
