@@ -1343,12 +1343,7 @@ runs:
 
         cd "$COMMON_KERNEL_FOLDER"
 
-        mkdir -p fs/nomount
-
-        cp -f "$NM_SRC/kernel/src/"* fs/nomount/
-
-        patch -p1 --forward --fuzz=1 < \
-          "$NM_SRC/kernel/patches/nomount_${KERNEL_VER}_kernel_integration.patch"
+        bash "$NM_SRC/kernel/setup.sh" dev
 
         grep -q 'source "fs/nomount/Kconfig"' fs/Kconfig || {
           echo "::error::NoMount Kconfig edit missing"
