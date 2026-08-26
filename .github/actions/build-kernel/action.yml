@@ -1329,8 +1329,8 @@ runs:
         set -euo pipefail
         echo "::group::Apply Maxsteel NoMount"
 
-        NM_SRC="$GITHUB_WORKSPACE/nomount-maxsteel"
-        rm -rf "$NM_SRC"
+        NM_SRC="$COMMON_KERNEL_FOLDER/NoMount"
+        rm -rf -- "$NM_SRC"
 
         git clone \
           --depth 1 \
@@ -1339,19 +1339,52 @@ runs:
           https://github.com/maxsteeel/nomount.git \
           "$NM_SRC"
 
+        NM_SHA="$(git -C "$NM_SRC" rev-parse HEAD)"
         DEFCONFIG="$COMMON_KERNEL_FOLDER/arch/arm64/configs/gki_defconfig"
 
         cd "$COMMON_KERNEL_FOLDER"
 
-        bash "$NM_SRC/kernel/setup.sh" dev
+        if [ -e fs/nomount ] || [ -L fs/nomount ]; then
+          rm -rf -- fs/nomount
+        fi
 
-        grep -q 'source "fs/nomount/Kconfig"' fs/Kconfig || {
-          echo "::error::NoMount Kconfig edit missing"
+        sed -i '\|^source "fs/nomount/Kconfig"$|d' fs/Kconfig
+        sed -i '\|^obj-$(CONFIG_NOMOUNT) += nomount/$|d' fs/Makefile
+
+        bash "$NM_SRC/kernel/setup.sh" "$NM_SHA"
+
+        INTEGRATED_NM_SHA="$(git -C "$NM_SRC" rev-parse HEAD)"
+        if [ "$INTEGRATED_NM_SHA" != "$NM_SHA" ]; then
+          echo "::error::NoMount source changed during setup: expected $NM_SHA, got $INTEGRATED_NM_SHA"
+          exit 1
+        fi
+
+        test -L fs/nomount || {
+          echo "::error::fs/nomount is not the symlink created by upstream setup.sh"
           exit 1
         }
 
-        grep -q 'obj-.*CONFIG_NOMOUNT.*nomount/' fs/Makefile || {
-          echo "::error::NoMount Makefile edit missing"
+        NM_EXPECTED_SRC="$(realpath "$NM_SRC/kernel/src")"
+        NM_ACTUAL_SRC="$(realpath fs/nomount)"
+        if [ "$NM_ACTUAL_SRC" != "$NM_EXPECTED_SRC" ]; then
+          echo "::error::fs/nomount points to $NM_ACTUAL_SRC instead of $NM_EXPECTED_SRC"
+          exit 1
+        fi
+
+        for required_file in Kconfig Makefile nomount.c nomount.h; do
+          test -f "fs/nomount/$required_file" || {
+            echo "::error::NoMount source missing: fs/nomount/$required_file"
+            exit 1
+          }
+        done
+
+        test "$(grep -cFx 'source "fs/nomount/Kconfig"' fs/Kconfig)" -eq 1 || {
+          echo "::error::Expected exactly one NoMount Kconfig entry"
+          exit 1
+        }
+
+        test "$(grep -cFx 'obj-$(CONFIG_NOMOUNT) += nomount/' fs/Makefile)" -eq 1 || {
+          echo "::error::Expected exactly one NoMount Makefile entry"
           exit 1
         }
 
@@ -1361,12 +1394,11 @@ runs:
         sed -i '/^CONFIG_NOMOUNT=/d' "$DEFCONFIG"
         echo "CONFIG_NOMOUNT=y" >> "$DEFCONFIG"
 
-        NM_SHA="$(git -C "$NM_SRC" rev-parse HEAD)"
-
         echo "NM_SHA=$NM_SHA" >> "$GITHUB_ENV"
 
-        echo "Maxsteel NoMount @ ${NM_SHA:0:12}"
+        echo "Maxsteel NoMount dev HEAD: $NM_SHA"
         echo "::endgroup::"
+
     - name: Add BBG
       if: ${{ env.OP_BBG == 'true' }}
       shell: bash
@@ -2123,13 +2155,28 @@ runs:
           exit 1
         }
 
-        grep -q 'source "fs/nomount/Kconfig"' fs/Kconfig || {
-          echo "::error::NoMount Kconfig entry missing"
+        test -L fs/nomount || {
+          echo "::error::fs/nomount is not an upstream setup symlink"
           exit 1
         }
 
-        grep -q 'nomount/' fs/Makefile || {
-          echo "::error::NoMount Makefile entry missing"
+        test "$(realpath fs/nomount)" = "$(realpath NoMount/kernel/src)" || {
+          echo "::error::fs/nomount does not point to NoMount/kernel/src"
+          exit 1
+        }
+
+        test "$(git -C NoMount rev-parse HEAD)" = "$NM_SHA" || {
+          echo "::error::Integrated NoMount SHA does not match logged NM_SHA=$NM_SHA"
+          exit 1
+        }
+
+        test "$(grep -cFx 'source "fs/nomount/Kconfig"' fs/Kconfig)" -eq 1 || {
+          echo "::error::Expected exactly one NoMount Kconfig entry"
+          exit 1
+        }
+
+        test "$(grep -cFx 'obj-$(CONFIG_NOMOUNT) += nomount/' fs/Makefile)" -eq 1 || {
+          echo "::error::Expected exactly one NoMount Makefile entry"
           exit 1
         }
 
