@@ -1,0 +1,54 @@
+diff --git a/fs/sysfs/file.c b/fs/sysfs/file.c
+index f21e73d10..087f75175 100644
+--- a/fs/sysfs/file.c
++++ b/fs/sysfs/file.c
+@@ -16,6 +16,7 @@
+ #include <linux/mutex.h>
+ #include <linux/seq_file.h>
+ #include <linux/mm.h>
++#include <linux/string.h>
+ 
+ #include "sysfs.h"
+ 
+@@ -133,6 +134,19 @@ static ssize_t sysfs_kf_write(struct kernfs_open_file *of, char *buf,
+ 	if (!count)
+ 		return 0;
+ 
++#if IS_ENABLED(CONFIG_OP13R_FORCE_ZRAM_LZ4K)
++	if (!strcmp(of->kn->name, "comp_algorithm") &&
++	    !strcmp(kobject_name(kobj), "zram0") &&
++	    sysfs_streq(buf, "lz4")) {
++		static const char lz4k[] = "lz4k";
++		ssize_t ret;
++
++		/* OxygenOS requests lz4 before it initializes the ZRAM device. */
++		ret = ops->store(kobj, of->kn->priv, lz4k, sizeof(lz4k) - 1);
++		return ret < 0 ? ret : count;
++	}
++#endif
++
+ 	return ops->store(kobj, of->kn->priv, buf, count);
+ }
+ 
+diff --git a/init/Kconfig b/init/Kconfig
+index 42d7d61b9..517306fed 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -1305,6 +1305,17 @@ config SCHED_AUTOGROUP
+ 	  desktop applications.  Task group autogeneration is currently based
+ 	  upon task session.
+ 
++config OP13R_FORCE_ZRAM_LZ4K
++	bool "Force LZ4K for OP13R ZRAM initialization"
++	depends on SYSFS
++	default n
++	help
++	  Replace the stock OxygenOS request for the LZ4 ZRAM compressor with
++	  the OnePlus LZ4K compressor on zram0. This leaves the remaining
++	  HybridSwap configuration and alternative compressors unchanged.
++
++	  If unsure, say N here.
++
+ config RT_SOFTIRQ_AWARE_SCHED
+ 	bool "Improve RT scheduling during long softirq execution"
+ 	depends on SMP && !PREEMPT_RT

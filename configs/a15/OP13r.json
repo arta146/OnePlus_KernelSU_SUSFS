@@ -18,6 +18,7 @@
   "opt": true,
   "bore": true,
   "lz4kd": true,
+  "lz4k": true,
   "ds": true,
   "bbg": true,
   "bbr": true,

@@ -1629,9 +1629,9 @@ runs:
         echo "✅ Optimisation Patches applied"
         echo "::endgroup::"
 
-    - name: Apply OP13R BORE and LZ4KD
+    - name: Apply OP13R BORE, LZ4KD and LZ4K selection
       shell: bash
-      if: ${{ env.OP_MODEL == 'OP13r' && env.KERNEL_VER == '6.1' && (env.OP_BORE == 'true' || env.OP_LZ4KD == 'true') }}
+      if: ${{ env.OP_MODEL == 'OP13r' && env.KERNEL_VER == '6.1' && (env.OP_BORE == 'true' || env.OP_LZ4KD == 'true' || env.OP_LZ4K == 'true') }}
       run: |
         set -euo pipefail
         echo "::group::Apply OP13R scheduler and ZRAM features"
@@ -1664,13 +1664,16 @@ runs:
           cp -a "$LZ4KD_FILES/lib/lz4kd/." lib/lz4kd/
 
           patch -p1 --forward --fuzz=0 < "$FEATURE_PATCH_DIR/0002-lz4kd-zram-android14-6.1.patch"
-          test -f "$CONFIG_FOLDER/vendor/oplus/kernel/mm/hybridswap_zram/zcomp.c"
-          patch -d "$CONFIG_FOLDER" -p1 --forward --fuzz=0 \
-            < "$FEATURE_PATCH_DIR/0003-oplus-hybridswap-zram-lz4kd.patch"
           scripts/config --file "$DEFCONFIG" -e CRYPTO_LZ4KD
           scripts/config --file "$DEFCONFIG" -d ZRAM_DEF_COMP_LZORLE
           scripts/config --file "$DEFCONFIG" -e ZRAM_DEF_COMP_LZ4KD
-          echo "✅ LZ4KD integrated into the kernel and the OnePlus HybridSwap ZRAM driver"
+          echo "✅ LZ4KD integrated into the kernel compression API"
+        fi
+
+        if [ "${OP_LZ4K:-false}" = "true" ]; then
+          patch -p1 --forward --fuzz=0 < "$FEATURE_PATCH_DIR/0003-op13r-force-zram-lz4k.patch"
+          scripts/config --file "$DEFCONFIG" -e OP13R_FORCE_ZRAM_LZ4K
+          echo "✅ OnePlus LZ4K selected for the OxygenOS HybridSwap ZRAM initialization"
         fi
 
         echo "::endgroup::"
@@ -2200,6 +2203,13 @@ runs:
           }
           grep -qx 'CONFIG_ZRAM_DEF_COMP="lz4kd"' "$OUT/.config" || {
             echo "::error::CONFIG_ZRAM_DEF_COMP is not lz4kd in final .config"
+            exit 1
+          }
+        fi
+
+        if [ "${OP_LZ4K:-false}" = "true" ]; then
+          grep -qx 'CONFIG_OP13R_FORCE_ZRAM_LZ4K=y' "$OUT/.config" || {
+            echo "::error::OP13R LZ4K ZRAM selection is not enabled in final .config"
             exit 1
           }
         fi
