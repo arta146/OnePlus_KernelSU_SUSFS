@@ -110,7 +110,8 @@ runs:
       run: |
         set -euo pipefail
         echo '${{ inputs.op_config_json }}' > /tmp/config.json
-        jq -r 'to_entries[] | "OP_\(.key | ascii_upcase)=\(.value)"' /tmp/config.json >> "$GITHUB_ENV"
+        jq -r '({bore: false, lz4kd: false, lz4k: false, tcp_nodelay: false} + .) |
+          to_entries[] | "OP_\(.key | ascii_upcase)=\(.value)"' /tmp/config.json >> "$GITHUB_ENV"
         echo "Parsed config:"
         jq '.' /tmp/config.json
 
@@ -1589,7 +1590,12 @@ runs:
         fi
         patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/common/minimise_wakeup_time.patch"
         patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/common/int_sqrt.patch"
-        patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/common/force_tcp_nodelay.patch"
+        if [ "${OP_TCP_NODELAY:-false}" = "true" ]; then
+          patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/common/force_tcp_nodelay.patch"
+          echo "Force TCP_NODELAY: enabled"
+        else
+          echo "Force TCP_NODELAY: disabled (preserving application socket options)"
+        fi
         patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/common/reduce_gc_thread_sleep_time.patch"
         patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/common/add_timeout_wakelocks_globally.patch"
         patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/common/f2fs_reduce_congestion.patch"
@@ -2271,6 +2277,10 @@ runs:
         echo "Kernel: ${KERNEL_FULL_VER}"
         echo "Threads: $(nproc --all)"
         echo "Optimization: ${{ inputs.optimize_level }}"
+        echo "BORE: ${OP_BORE:-false}"
+        echo "LZ4KD: ${OP_LZ4KD:-false}"
+        echo "HybridSwap LZ4K: ${OP_LZ4K:-false}"
+        echo "Force TCP_NODELAY: ${OP_TCP_NODELAY:-false}"
         echo "KCFLAGS: ${KCFLAGS:0:150}..."
         echo "KCPPFLAGS: ${KCPPFLAGS:0:150}..."
         echo "Timestamp: $KBUILD_BUILD_TIMESTAMP"
@@ -2571,6 +2581,10 @@ runs:
           echo ""
           echo "=== OnePlus Features ==="
           echo "Kernel Optimisations: ${{ env.OP_OPT }}"
+          echo "BORE: ${{ env.OP_BORE }}"
+          echo "LZ4KD: ${{ env.OP_LZ4KD }}"
+          echo "HybridSwap LZ4K: ${{ env.OP_LZ4K }}"
+          echo "Force TCP_NODELAY: ${{ env.OP_TCP_NODELAY }}"
           echo "BBR: ${{ env.OP_BBR }}"
           echo "BBRv3: ${{ env.OP_BBR3 }}"
           echo "BBG: ${{ env.OP_BBG }}"
@@ -2638,6 +2652,10 @@ runs:
           echo "| Feature | Status |"
           echo "|---------|--------|"
           echo "| **Kernel Optimisations** | ${{ env.OP_OPT }} |"
+          echo "| **BORE 5.3.0** | ${{ env.OP_BORE }} |"
+          echo "| **LZ4KD** | ${{ env.OP_LZ4KD }} |"
+          echo "| **HybridSwap LZ4K** | ${{ env.OP_LZ4K }} |"
+          echo "| **Force TCP_NODELAY** | ${{ env.OP_TCP_NODELAY }} |"
           echo "| **BBR** | ${{ env.OP_BBR }} |"
           echo "| **BBRv3** | ${{ env.OP_BBR3 }} |"
           echo "| **BBG** | ${{ env.OP_BBG }} |"

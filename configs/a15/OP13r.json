@@ -16,6 +16,7 @@
   "hmbird": false,
   "susfs": true,
   "opt": true,
+  "tcp_nodelay": false,
   "bore": true,
   "lz4kd": true,
   "lz4k": true,
