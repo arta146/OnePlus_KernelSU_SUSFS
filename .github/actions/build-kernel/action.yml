@@ -1664,10 +1664,13 @@ runs:
           cp -a "$LZ4KD_FILES/lib/lz4kd/." lib/lz4kd/
 
           patch -p1 --forward --fuzz=0 < "$FEATURE_PATCH_DIR/0002-lz4kd-zram-android14-6.1.patch"
+          test -f "$CONFIG_FOLDER/vendor/oplus/kernel/mm/hybridswap_zram/zcomp.c"
+          patch -d "$CONFIG_FOLDER" -p1 --forward --fuzz=0 \
+            < "$FEATURE_PATCH_DIR/0003-oplus-hybridswap-zram-lz4kd.patch"
           scripts/config --file "$DEFCONFIG" -e CRYPTO_LZ4KD
           scripts/config --file "$DEFCONFIG" -d ZRAM_DEF_COMP_LZORLE
           scripts/config --file "$DEFCONFIG" -e ZRAM_DEF_COMP_LZ4KD
-          echo "✅ LZ4KD integrated and selected as the default ZRAM compressor"
+          echo "✅ LZ4KD integrated into the kernel and the OnePlus HybridSwap ZRAM driver"
         fi
 
         echo "::endgroup::"

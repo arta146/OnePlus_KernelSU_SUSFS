@@ -24,6 +24,11 @@ API and ZRAM. The implementation files are fetched from `SukiSU_patch` at the
 pinned commit `547ae94bcaec53d030398f857950c64662043a5d`; unrelated upstream module
 blacklist changes are deliberately not included.
 
+`0003-oplus-hybridswap-zram-lz4kd.patch` also connects LZ4KD to the custom
+OnePlus HybridSwap ZRAM driver used by OxygenOS. It keeps the configured LZ4KD
+default when OxygenOS attempts to select the stock LZ4 backend during early
+boot.
+
 The OP13R configuration enables `CONFIG_CRYPTO_LZ4KD=y` and selects LZ4KD as
 the default ZRAM compressor.
 
