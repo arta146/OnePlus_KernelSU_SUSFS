@@ -1629,6 +1629,49 @@ runs:
         echo "✅ Optimisation Patches applied"
         echo "::endgroup::"
 
+    - name: Apply OP13R BORE and LZ4KD
+      shell: bash
+      if: ${{ env.OP_MODEL == 'OP13r' && env.KERNEL_VER == '6.1' && (env.OP_BORE == 'true' || env.OP_LZ4KD == 'true') }}
+      run: |
+        set -euo pipefail
+        echo "::group::Apply OP13R scheduler and ZRAM features"
+        cd "$COMMON_KERNEL_FOLDER"
+
+        FEATURE_PATCH_DIR="$GITHUB_WORKSPACE/action-source/patches/op13r"
+        DEFCONFIG="$COMMON_KERNEL_FOLDER/arch/arm64/configs/gki_defconfig"
+
+        if [ "${OP_BORE:-false}" = "true" ]; then
+          patch -p1 --forward --fuzz=0 < "$FEATURE_PATCH_DIR/0001-sched-bore-5.3.0-android14-6.1.patch"
+          scripts/config --file "$DEFCONFIG" -e SCHED_BORE
+          echo "✅ BORE 5.3.0 integrated"
+        fi
+
+        if [ "${OP_LZ4KD:-false}" = "true" ]; then
+          LZ4KD_UPSTREAM_SHA="547ae94bcaec53d030398f857950c64662043a5d"
+          LZ4KD_SOURCE="$GITHUB_WORKSPACE/lz4kd-source"
+
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/SukiSU-Ultra/SukiSU_patch.git "$LZ4KD_SOURCE"
+          git -C "$LZ4KD_SOURCE" fetch --depth=1 origin "$LZ4KD_UPSTREAM_SHA"
+          git -C "$LZ4KD_SOURCE" checkout --detach "$LZ4KD_UPSTREAM_SHA"
+
+          test "$(git -C "$LZ4KD_SOURCE" rev-parse HEAD)" = "$LZ4KD_UPSTREAM_SHA"
+
+          LZ4KD_FILES="$LZ4KD_SOURCE/other/zram/lz4k"
+          install -m 0644 "$LZ4KD_FILES/include/linux/lz4kd.h" include/linux/lz4kd.h
+          install -m 0644 "$LZ4KD_FILES/crypto/lz4kd.c" crypto/lz4kd.c
+          mkdir -p lib/lz4kd
+          cp -a "$LZ4KD_FILES/lib/lz4kd/." lib/lz4kd/
+
+          patch -p1 --forward --fuzz=0 < "$FEATURE_PATCH_DIR/0002-lz4kd-zram-android14-6.1.patch"
+          scripts/config --file "$DEFCONFIG" -e CRYPTO_LZ4KD
+          scripts/config --file "$DEFCONFIG" -d ZRAM_DEF_COMP_LZORLE
+          scripts/config --file "$DEFCONFIG" -e ZRAM_DEF_COMP_LZ4KD
+          echo "✅ LZ4KD integrated and selected as the default ZRAM compressor"
+        fi
+
+        echo "::endgroup::"
+
     - name: Apply NTSync Patch
       shell: bash
       if: ${{ env.OP_NTSYNC == 'true' }}
@@ -2135,6 +2178,28 @@ runs:
         
         
         make LD="$COMMON_KERNEL_FOLDER/ld-wrapper" HOSTLD="$COMMON_KERNEL_FOLDER/ld-wrapper" O="$OUT" olddefconfig
+
+        if [ "${OP_BORE:-false}" = "true" ]; then
+          grep -qx 'CONFIG_SCHED_BORE=y' "$OUT/.config" || {
+            echo "::error::CONFIG_SCHED_BORE is not enabled in final .config"
+            exit 1
+          }
+        fi
+
+        if [ "${OP_LZ4KD:-false}" = "true" ]; then
+          grep -qx 'CONFIG_CRYPTO_LZ4KD=y' "$OUT/.config" || {
+            echo "::error::CONFIG_CRYPTO_LZ4KD is not enabled in final .config"
+            exit 1
+          }
+          grep -qx 'CONFIG_ZRAM_DEF_COMP_LZ4KD=y' "$OUT/.config" || {
+            echo "::error::LZ4KD is not the default ZRAM compressor in final .config"
+            exit 1
+          }
+          grep -qx 'CONFIG_ZRAM_DEF_COMP="lz4kd"' "$OUT/.config" || {
+            echo "::error::CONFIG_ZRAM_DEF_COMP is not lz4kd in final .config"
+            exit 1
+          }
+        fi
 
         echo "============================================"
         echo "🔎 Verify final NoMount integration"

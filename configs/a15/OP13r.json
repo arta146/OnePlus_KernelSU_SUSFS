@@ -16,6 +16,8 @@
   "hmbird": false,
   "susfs": true,
   "opt": true,
+  "bore": true,
+  "lz4kd": true,
   "ds": true,
   "bbg": true,
   "bbr": true,

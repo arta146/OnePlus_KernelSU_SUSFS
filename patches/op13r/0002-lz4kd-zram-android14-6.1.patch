@@ -1,0 +1,115 @@
+diff --git a/crypto/Kconfig b/crypto/Kconfig
+index 2c4e3b0f2..bf460fc9c 100644
+--- a/crypto/Kconfig
++++ b/crypto/Kconfig
+@@ -1263,6 +1263,14 @@ config CRYPTO_LZ4
+ 
+ 	  See https://github.com/lz4/lz4 for further information.
+ 
++config CRYPTO_LZ4KD
++	tristate "LZ4KD"
++	select CRYPTO_ALGAPI
++	select LZ4KD_COMPRESS
++	select LZ4KD_DECOMPRESS
++	help
++	  LZ4KD is a fast compression algorithm optimized for ZRAM workloads.
++
+ config CRYPTO_LZ4HC
+ 	tristate "LZ4HC"
+ 	select CRYPTO_ALGAPI
+diff --git a/crypto/Makefile b/crypto/Makefile
+index 1fa1ea16e..8fabd5baa 100644
+--- a/crypto/Makefile
++++ b/crypto/Makefile
+@@ -161,6 +161,7 @@ obj-$(CONFIG_CRYPTO_CRC64_ROCKSOFT) += crc64_rocksoft_generic.o
+ obj-$(CONFIG_CRYPTO_AUTHENC) += authenc.o authencesn.o
+ obj-$(CONFIG_CRYPTO_LZO) += lzo.o lzo-rle.o
+ obj-$(CONFIG_CRYPTO_LZ4) += lz4.o
++obj-$(CONFIG_CRYPTO_LZ4KD) += lz4kd.o
+ obj-$(CONFIG_CRYPTO_LZ4HC) += lz4hc.o
+ obj-$(CONFIG_CRYPTO_XXHASH) += xxhash_generic.o
+ obj-$(CONFIG_CRYPTO_842) += 842.o
+diff --git a/drivers/block/zram/Kconfig b/drivers/block/zram/Kconfig
+index d4100b0c0..eabd6a67a 100644
+--- a/drivers/block/zram/Kconfig
++++ b/drivers/block/zram/Kconfig
+@@ -2,7 +2,7 @@
+ config ZRAM
+ 	tristate "Compressed RAM block device support"
+ 	depends on BLOCK && SYSFS && MMU
+-	depends on CRYPTO_LZO || CRYPTO_ZSTD || CRYPTO_LZ4 || CRYPTO_LZ4HC || CRYPTO_842
++	depends on CRYPTO_LZO || CRYPTO_ZSTD || CRYPTO_LZ4 || CRYPTO_LZ4HC || CRYPTO_LZ4KD || CRYPTO_842
+ 	select ZSMALLOC
+ 	help
+ 	  Creates virtual block devices called /dev/zramX (X = 0, 1, ...).
+@@ -17,6 +17,7 @@ config ZRAM
+ 
+ choice
+ 	prompt "Default zram compressor"
++	default ZRAM_DEF_COMP_LZ4KD if CRYPTO_LZ4KD
+ 	default ZRAM_DEF_COMP_LZORLE
+ 	depends on ZRAM
+ 
+@@ -40,6 +41,10 @@ config ZRAM_DEF_COMP_LZ4HC
+ 	bool "lz4hc"
+ 	depends on CRYPTO_LZ4HC
+ 
++config ZRAM_DEF_COMP_LZ4KD
++	bool "lz4kd"
++	depends on CRYPTO_LZ4KD
++
+ config ZRAM_DEF_COMP_842
+ 	bool "842"
+ 	depends on CRYPTO_842
+@@ -53,6 +58,7 @@ config ZRAM_DEF_COMP
+ 	default "lz4" if ZRAM_DEF_COMP_LZ4
+ 	default "lzo" if ZRAM_DEF_COMP_LZO
+ 	default "lz4hc" if ZRAM_DEF_COMP_LZ4HC
++	default "lz4kd" if ZRAM_DEF_COMP_LZ4KD
+ 	default "842" if ZRAM_DEF_COMP_842
+ 
+ config ZRAM_WRITEBACK
+diff --git a/drivers/block/zram/zcomp.c b/drivers/block/zram/zcomp.c
+index 0916de952..d190b4ea2 100644
+--- a/drivers/block/zram/zcomp.c
++++ b/drivers/block/zram/zcomp.c
+@@ -25,6 +25,9 @@ static const char * const backends[] = {
+ #if IS_ENABLED(CONFIG_CRYPTO_LZ4HC)
+ 	"lz4hc",
+ #endif
++#if IS_ENABLED(CONFIG_CRYPTO_LZ4KD)
++	"lz4kd",
++#endif
+ #if IS_ENABLED(CONFIG_CRYPTO_842)
+ 	"842",
+ #endif
+diff --git a/lib/Kconfig b/lib/Kconfig
+index 9bbf8a4b2..98fd5abe4 100644
+--- a/lib/Kconfig
++++ b/lib/Kconfig
+@@ -340,6 +340,12 @@ config LZ4HC_COMPRESS
+ config LZ4_DECOMPRESS
+ 	tristate
+ 
++config LZ4KD_COMPRESS
++	tristate
++
++config LZ4KD_DECOMPRESS
++	tristate
++
+ config ZSTD_COMMON
+ 	select XXHASH
+ 	tristate
+diff --git a/lib/Makefile b/lib/Makefile
+index d25dac314..c20dcfdba 100644
+--- a/lib/Makefile
++++ b/lib/Makefile
+@@ -198,6 +198,8 @@ obj-$(CONFIG_LZO_DECOMPRESS) += lzo/
+ obj-$(CONFIG_LZ4_COMPRESS) += lz4/
+ obj-$(CONFIG_LZ4HC_COMPRESS) += lz4/
+ obj-$(CONFIG_LZ4_DECOMPRESS) += lz4/
++obj-$(CONFIG_LZ4KD_COMPRESS) += lz4kd/
++obj-$(CONFIG_LZ4KD_DECOMPRESS) += lz4kd/
+ obj-$(CONFIG_ZSTD_COMPRESS) += zstd/
+ obj-$(CONFIG_ZSTD_DECOMPRESS) += zstd/
+ obj-$(CONFIG_XZ_DEC) += xz/
