@@ -68,10 +68,8 @@ Flashing this kernel will not void your warranty, but there is always a risk of 
 ## ✨ Features
 
 - 🔐 **KernelSU / KernelSU-Next**: A root solution for Android GKI devices that works in kernel mode and grants root permission to userspace applications directly in kernel space
-- 🔥 **WildKSU Manager Support**: Support for the Root Manager developed by our team with lots of customisations
 - 🥷 **SUSFS**: An addon root hiding kernel patches and userspace module for KernelSU
 - 🛡️ **BBG**: LSM-based Baseband Guard security to protect critical device partitions. abl/efisp can be added to whitelist for efisp exploit devices.
-- 🛠️ **HMBIRD SCX**: Scheduler extensions for SM8750/MT6991 devices
 - 🖧 **BBRv1**: Improved TCP congestion control
 - 🖧 **BBRv3**: Improved TCP congestion control
 - 🚦 **CAKE and PIE qdisc Support**: Better Net Schedulers
@@ -136,14 +134,4 @@ If you encounter any issues or need help, feel free to:
 [![Telegram Group](https://img.shields.io/badge/Telegram-WildKernels-blue?logo=telegram)](https://t.me/WildKernelsTG)
 
 </div>
-
----
-
-## 💝 Donations
-
-Any and all donations are appreciated!
-
-PayPal: [paypal.me/fatalcoder524](https://paypal.me/fatalcoder524)
-
-DM on Telegram for UPI donations!
 

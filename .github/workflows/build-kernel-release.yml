@@ -853,7 +853,7 @@ jobs:
       REPO_NAME: ${{ github.event.repository.name }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       SUSFS_BASE_VERSION: ${{ needs.set-op-model.outputs.susfs_base_version }}
-      RELEASE_NAME: '*TEST BUILD* OnePlus Kernels With KernelSU Next & SUSFS ${{ needs.set-op-model.outputs.susfs_base_version }} *TEST BUILD*'
+      RELEASE_NAME: 'OP13R-6.1.118v1'
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v6
@@ -928,21 +928,8 @@ jobs:
           OPTIMIZE_LEVEL="${{ inputs.optimize_level }}"
           CLEAN_BUILD="${{ inputs.clean_build }}"
           
-          # Hash map for GKI version
-          declare -A susfs_map=(
-            ["android12-5.10"]="${{ needs.set-op-model.outputs.susfs_hash_android12_5_10 }}"
-            ["android13-5.15"]="${{ needs.set-op-model.outputs.susfs_hash_android13_5_15 }}"
-            ["android14-6.1"]="${{ needs.set-op-model.outputs.susfs_hash_android14_6_1 }}"
-            ["android15-6.6"]="${{ needs.set-op-model.outputs.susfs_hash_android15_6_6 }}"
-            ["android16-6.12"]="${{ needs.set-op-model.outputs.susfs_hash_android16_6_12 }}"
-          )
-          
-          # List of GKI versions present in this run
-          IFS=',' read -ra active_gki_keys \
-            <<< "${{ needs.set-op-model.outputs.active_gki_keys }}"
-          
           cat << EOF > release_notes.md
-          # 🎯 OnePlus Kernels with KernelSU Next & SUSFS $SUSFS_BASE_VERSION
+          # OP13R 6.1.118 v1
           
           > **Build Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')  
           > **Build ID:** \`${{ github.run_id }}\`  
@@ -950,7 +937,7 @@ jobs:
           
           ---
           
-          ## 📦 Built Devices (${#device_info[@]} total)
+          ## Kernel
           
           | Model | OS Version | Kernel Version | Features |
           |-------|------------|----------------|----------|
@@ -970,7 +957,7 @@ jobs:
             feature_flags=$(jq -r --arg MODEL "$model" --arg ORIG_MODEL "$possible_orig_model" --arg OS "$os_ver" '
               ([ .[] | select(.model == $ORIG_MODEL and .os_version == $OS) ][0]) //
               ([ .[] | select(.model == $MODEL      and .os_version == $OS) ][0]) |
-              "\(.hmbird // false)\t\(.susfs // false)\t\(.bbr // false)\t\(.bbr3 // false)\t\(.bbg // false)\t\(.ttl // false)\t\(.ip_set // false)\t\(.unicode // false)\t\(.ds // false)\t\(.ntsync // false)\t\(.bore // false)\t\(.lz4kd // false)\t\(.lz4k // false)\t\(.tcp_nodelay // false)"
+              "\(.susfs // false)\t\(.bbr // false)\t\(.bbr3 // false)\t\(.bbg // false)\t\(.ttl // false)\t\(.ip_set // false)\t\(.unicode // false)\t\(.ds // false)\t\(.ntsync // false)\t\(.bore // false)\t\(.lz4kd // false)\t\(.lz4k // false)\t\(.tcp_nodelay // false)"
             ' <<< "$JSON_BUILD_DATA")
             
             features=()
@@ -979,10 +966,9 @@ jobs:
               echo "Warning: No JSON entry found for model: $model" >&2
               features_str="N/A"
             else
-              IFS=$'\t' read -r hmbird susfs bbr bbr3 bbg ttl ip_set unicode ds ntsync bore lz4kd lz4k tcp_nodelay <<< "$feature_flags"
+              IFS=$'\t' read -r susfs bbr bbr3 bbg ttl ip_set unicode ds ntsync bore lz4kd lz4k tcp_nodelay <<< "$feature_flags"
               
               # Build features string based on boolean values
-              [[ "$hmbird" == "true" ]] && features+=("🐦 HMBIRD")
               [[ "$susfs" == "true" ]] && features+=("ඞ SusFS")
               [[ "$bbr" == "true" ]] && features+=("🚀 BBR")
               [[ "$bbr3" == "true" ]] && features+=("🚀 BBRv3")
@@ -1077,133 +1063,65 @@ jobs:
           fi
           cat << EOF >> release_notes.md
           | **SUSFS Version** | \`$SUSFS_BASE_VERSION\` |
+          | **Device** | \`OnePlus 13R (OP13R)\` |
+          | **Kernel Base** | \`Android 14 / Linux 6.1.118\` |
+          | **Target OS** | \`OxygenOS 15\` |
           | **Optimization Level** | \`$OPTIMIZE_LEVEL\` |
           | **Clean Build** | $( [ "$CLEAN_BUILD" = "true" ] && echo "✅ Yes (no ccache)" || echo "❌ No (ccache enabled)" ) |
-          | **Compiler** | Clang (version varies by device) |
-          
-          ### 📌 SUSFS Branch Mapping
-          
-          | Kernel Version | SUSFS Commit |
-          |----------------|--------------|
-          $(for key in "${active_gki_keys[@]}"; do
-            echo "| $key | \`${susfs_map[$key]:-unknown}\` |"
-          done)
+          | **Compiler** | \`Clang\` |
           
           ---
           
-          ## ✨ Features & Capabilities
+          ## Included features
           
-          ### 🔐 Root Management
+          ### Root and hiding
           EOF
           if [ "$ksu_type" == "KSUN" ]; then
             cat << EOF >> release_notes.md
-          - **KernelSU Next** - Next-generation kernel-level root solution
+          - **KernelSU Next**
           EOF
           elif [ "$ksu_type" == "KSU" ]; then
             cat << EOF >> release_notes.md
-          - **KernelSU** - Kernel-level root solution
+          - **KernelSU**
           EOF
           fi
           cat << EOF >> release_notes.md
-          - **SUSFS $SUSFS_BASE_VERSION** - Advanced hiding and security features
-          EOF
-          if [ "$ksu_type" == "KSUN" ] && [ "${ksu_ver_global:-0}" -lt 12884 ]; then
-            cat << EOF >> release_notes.md
-          - **Magic Mount Support** - Seamless file system modifications
-          EOF
-          fi
-          if [ "${ksu_ver_global:-0}" -lt 12884 ]; then
-            cat << EOF >> release_notes.md
-          - **Manual Hooks** - scope_min_manual_hooks_v1.4 for better compatibility
-          EOF
-          fi
-          cat << EOF >> release_notes.md
-          ### 🛡️ Security & Privacy
-          - **Baseband Guard (BBG)** - LSM-based baseband security
-          - **SUSFS Hide Features**:
-            - ✅ SUS_PATH - Hide suspicious paths
-            - ✅ SUS_MOUNT - Hide mount points (No Cli Support)
-            - ✅ SUS_KSTAT - Spoof kernel statistics
-            - ✅ SPOOF_UNAME - Kernel version spoofing
-            - ✅ SPOOF_CMDLINE - Boot parameters spoofing
-            - ✅ OPEN_REDIRECT - File access redirection
-            - ✅ SUS_MAP - Memory mapping protection
-            - ✅ AVC_SPOOF - Spoof Procfs avc denial logs
-          - **Ptrace Leak Fix** - For kernels < 5.16
-          - **Unicode Fix** - Prevent path traversal and other detections using non-printable Unicode codepoints [Experimental]
-          
-          ### 🚀 Performance & Networking
-          - **BBRv1** - Improved TCP congestion control
-          - **BBRv3** - Improved TCP congestion control
-          - **CAKE and PIE qdisc Support** - Better Net Schedulers
-          - **Wireguard** - Built-in VPN support
-          - **IP Set & IPv6 NAT Support** - Advanced firewall capabilities and IPv6 NAT Support
-          - **TTL Target Support** - Network packet manipulation
-          - **LTO (Link Time Optimization)** - Optimized binary size and performance
-          - **ccache-accelerated builds** - Faster compilation times
-          - **Optimisation Patches** - Memory, I/O, CPU scheduler, network and other general tunings
-          
-          ### 🔧 System Features
-          - **TMPFS_XATTR** - Extended attributes for tmpfs (Mountify support)
-          - **TMPFS_POSIX_ACL** - POSIX ACLs for tmpfs
-          - **HMBIRD SCX** - Scheduler extensions for all SM8750/MT6991 devices
-          - **Droidspaces** - Support Portable Linux containers to run full Linux environments.
-          - **NTSync** - Provide high-performance, low-latency synchronization primitives compatible with the Windows NT kernel API
+          - **SUSFS $SUSFS_BASE_VERSION**
+          - **Maxsteel NoMount**
+          - **Baseband Guard (BBG)**
+          - **Unicode bypass fix**
+
+          ### Performance and memory
+          - **BORE 5.3.0 scheduler**
+          - **LZ4K/LZ4KD ZRAM compression**
+          - **LZ4K selected for OnePlus HybridSwap**
+          - **ThinLTO and $OPTIMIZE_LEVEL optimizations**
+          - **General memory, I/O and scheduler optimizations**
+          - **Forced TCP_NODELAY disabled**
+
+          ### Networking
+          - **BBRv1 and BBRv3**
+          - **FQ, FQ-CoDel, FQ-PIE, CAKE and PIE qdisc**
+          - **IP_SET and IPv6 NAT**
+          - **TTL target**
+
+          ### System
+          - **TMPFS_XATTR and TMPFS_POSIX_ACL**
+          - **Droidspaces**
+          - **NTSync**
           
           ---
           
-          ## 📱 Manager Applications
-          
-          ### Official Manager
-          EOF
-          if [ "$ksu_type" == "KSUN" ]; then
-            cat << EOF >> release_notes.md
-          - **KernelSU Next Manager**  
-            → [GitHub Release](https://github.com/KernelSU-Next/KernelSU-Next/releases)
-          EOF
-          elif [ "$ksu_type" == "KSU" ]; then
-            cat << EOF >> release_notes.md
-          - **KernelSU Manager**  
-            → [GitHub Release](https://github.com/tiann/KernelSU/releases)
-          EOF
-          fi
-          cat << EOF >> release_notes.md
-          ### Community Managers
-          - **WildKSU Manager** (Recommended for additional features)  
-            → [GitHub Release](https://github.com/WildKernels/Wild_KSU/releases)
-          
-          ### Required Module
-          - **KSU SUSFS Module** (Required for SUSFS features)  
-            → [GitHub Release](https://github.com/sidex15/ksu_module_susfs/releases)
-          
-          ### Recomended Flasher
-          - **Kernel Flasher** (Required for flashing AnyKernel3 zips and backups and OTA)  
-            → [GitHub Release](https://github.com/fatalcoder524/KernelFlasher/releases)
+          ## Compatibility and installation
+
+          - **Device:** OnePlus 13R only.
+          - **Firmware:** OxygenOS 15 with the matching 6.1.118 kernel base.
+          - Back up the current boot image before flashing.
+          - Flash the generated AnyKernel3 ZIP to the active slot and reboot.
           
           ---
           
-          ## 📥 Installation Instructions
-          
-          ### Prerequisites
-          - Unlocked bootloader.
-          - Backup your current boot image.
-          - Have root access using Magisk / KernelSU / Apatch (Any forks).
-          
-          ### Via Kernel Flasher
-          1. Download the correct AnyKernel3 ZIP for your device.
-          2. If you previously used another root method, clean it up first:
-              a. **Magisk**: perform a complete uninstall **after flashing the AnyKernel3 ZIP**.
-              b. **KSU LKM (boot/init_boot/vendor_boot patched)**: Flash back the stock boot/init_boot/vendor_boot depending on what you patched.
-              c. **KSU GKI**: if you are 100% sure you already flashed stock init_boot/boot/vendor_boot, no action is needed; otherwise, follow the same steps as KSU LKM.
-              d. **APatch**: remove /data/adb contents to avoid leftover root conflicts **after flashing the AnyKernel3 ZIP**.
-          3. Flash the ZIP to the active slot using Kernel Flasher.
-          4. Install the KernelSU-Next Manager APK, same version as mentioned in the AnyKernel3 ZIP name.
-          5. Open the KernelSU-Next app.
-          6. Reboot the device if you performed any cleanup in step 2.
-          
-          ---
-          
-          ## 📜 Changelog
+          ## Changes in OP13R-6.1.118v1
           
           ### This Release
           EOF
@@ -1217,36 +1135,21 @@ jobs:
             echo "- Disabled forced TCP_NODELAY so applications retain control of their socket options." >> release_notes.md
           fi
           cat << EOF >> release_notes.md
-          - Updated SUSFS to $SUSFS_BASE_VERSION.
-          - Added HMBIRD support for all SM8750/MT6991 devices.
-          - Improved ccache build system.
-          - Enhanced SUSFS hiding capabilities.
-          - Added IP_SET, IPv6 NAT and TTL support.
-          - Added TMPFS_XATTR and TMPFS_POSIX_ACL support for Mountify.
-          - Added Ptrace leak fix for kernels < 5.16.
-          - Compiler optimizations (${{ inputs.optimize_level }}).
-          - Additional General Optimisations.
-          - Wild_KSU Manager Support.
-          - Unicode Bypass Fix
-          - Droidspaces Support
-          - NTSync Support
-          
-          ### Previous Releases
-          See [Releases Page](${{ github.server_url }}/${{ github.repository }}/releases)
+          - SUSFS $SUSFS_BASE_VERSION with Maxsteel NoMount integration.
+          - BBRv1, BBRv3, IP_SET, IPv6 NAT and TTL support.
+          - BBG, Unicode bypass fix, Droidspaces and NTSync.
+          - TMPFS_XATTR and TMPFS_POSIX_ACL.
+          - ThinLTO with ${{ inputs.optimize_level }} compiler optimization.
           
           ---
           
-          ## 🙏 Credits
+          ## Credits
           
           - **KernelSU Next Team** - Root solution
           - **KernelSU Team** - Root solution
           - **simonpunk** - SUSFS development
           - **OnePlus** - Kernel source code
-          - **Community Contributors** - Testing and feedback
-          
-          ---
-          
-          **⚡ Built with ❤️ by the community**
+          - **maxsteeel** - NoMount
           
           EOF
           
