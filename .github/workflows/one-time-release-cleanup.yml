@@ -1,0 +1,101 @@
+name: One-time release cleanup
+
+on:
+  push:
+    paths:
+      - .github/workflows/one-time-release-cleanup.yml
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup-releases:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep the latest kernel release and refresh its metadata
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const serviceTags = new Set(['toolchain-cache', 'ccache-cache']);
+
+            const releases = await github.paginate(
+              github.rest.repos.listReleases,
+              { owner, repo, per_page: 100 }
+            );
+
+            const kernelReleases = releases
+              .filter(release => !serviceTags.has(release.tag_name))
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            if (kernelReleases.length === 0) {
+              core.setFailed('No kernel release was found. Nothing was changed.');
+              return;
+            }
+
+            const latest = kernelReleases[0];
+            const body = [
+              '# OP13R-6.1.118v1',
+              '',
+              '## Compatibility',
+              '',
+              '- Device: OnePlus 13R (OP13R)',
+              '- Firmware: OxygenOS 15',
+              '- Kernel base: Android 14 / Linux 6.1.118',
+              '- SUSFS: v2.3.0',
+              '',
+              '## Root and hiding',
+              '',
+              '- KernelSU Next',
+              '- SUSFS v2.3.0',
+              '- Maxsteel NoMount',
+              '- Baseband Guard (BBG)',
+              '- Unicode bypass fix',
+              '',
+              '## Performance and memory',
+              '',
+              '- BORE 5.3.0 scheduler',
+              '- LZ4K/LZ4KD ZRAM compression',
+              '- LZ4K selected as the active OnePlus HybridSwap compressor',
+              '- ThinLTO and O2 compiler optimization',
+              '- Memory, I/O, and scheduler optimizations',
+              '- Forced TCP_NODELAY disabled',
+              '',
+              '## Networking',
+              '',
+              '- BBRv1 and BBRv3',
+              '- FQ, FQ-CoDel, FQ-PIE, CAKE, and PIE queue disciplines',
+              '- IP_SET and IPv6 NAT',
+              '- TTL target',
+              '',
+              '## System',
+              '',
+              '- TMPFS_XATTR and TMPFS_POSIX_ACL',
+              '- Droidspaces',
+              '- NTSync',
+              '',
+              '## Installation note',
+              '',
+              'Use only on OnePlus 13R with OxygenOS 15 and the matching Linux 6.1.118 kernel base. Back up the current boot image before flashing.'
+            ].join('\n');
+
+            await github.rest.repos.updateRelease({
+              owner,
+              repo,
+              release_id: latest.id,
+              name: 'OP13R-6.1.118v1',
+              body
+            });
+
+            core.info(`Updated latest release: ${latest.tag_name} (${latest.id})`);
+
+            for (const release of kernelReleases.slice(1)) {
+              await github.rest.repos.deleteRelease({
+                owner,
+                repo,
+                release_id: release.id
+              });
+              core.info(`Deleted old kernel release: ${release.tag_name} (${release.id})`);
+            }
+
+            core.info('Preserved service releases: toolchain-cache and ccache-cache');
