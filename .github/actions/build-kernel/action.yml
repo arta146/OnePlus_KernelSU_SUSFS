@@ -1648,6 +1648,25 @@ runs:
 
         if [ "${OP_BORE:-false}" = "true" ]; then
           patch -p1 --forward --fuzz=0 < "$FEATURE_PATCH_DIR/0001-sched-bore-5.3.0-android14-6.1.patch"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          fair = Path("kernel/sched/fair.c")
+          source = fair.read_text()
+          needle = "\tutil_est_dequeue(&rq->cfs, p);\n"
+          bore = """#ifdef CONFIG_SCHED_BORE
+          \tif (task_sleep) {
+          \t\tcfs_rq = cfs_rq_of(se);
+          \t\tif (cfs_rq->curr == se)
+          \t\t\tupdate_curr(cfs_rq);
+          \t\trestart_burst(se);
+          \t}
+          #endif
+          """
+          if source.count(needle) != 1:
+              raise SystemExit("Expected exactly one util_est_dequeue insertion point")
+          fair.write_text(source.replace(needle, needle + bore, 1))
+          PY
           scripts/config --file "$DEFCONFIG" -e SCHED_BORE
           echo "✅ BORE 5.3.0 integrated"
         fi
