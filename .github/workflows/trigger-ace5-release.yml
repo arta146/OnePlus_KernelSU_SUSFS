@@ -2,7 +2,7 @@ name: Trigger OnePlus Ace 5 Release Build
 
 permissions:
   actions: write
-  contents: read
+  contents: write
 
 on:
   push:
@@ -15,10 +15,22 @@ jobs:
   dispatch:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout branch
+        uses: actions/checkout@v6
+
       - name: Start OnePlus Ace 5 build and release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          before_run=$(gh run list \
+            --repo "${{ github.repository }}" \
+            --workflow build-kernel-release.yml \
+            --branch "${{ github.ref_name }}" \
+            --event workflow_dispatch \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId // 0')
+
           gh workflow run build-kernel-release.yml \
             --repo "${{ github.repository }}" \
             --ref "${{ github.ref_name }}" \
@@ -27,5 +39,38 @@ jobs:
             -f ksu_options='[{"type":"ksun","hash":"dev-susfs"}]' \
             -f optimize_level=O2 \
             -f clean_build=false \
-            -f debug=false \
+            -f debug=true \
             -f mirror_toolchains=false
+
+          run_id=0
+          for attempt in $(seq 1 30); do
+            run_id=$(gh run list \
+              --repo "${{ github.repository }}" \
+              --workflow build-kernel-release.yml \
+              --branch "${{ github.ref_name }}" \
+              --event workflow_dispatch \
+              --limit 1 \
+              --json databaseId \
+              --jq '.[0].databaseId // 0')
+            if [ "$run_id" != "0" ] && [ "$run_id" != "$before_run" ]; then
+              break
+            fi
+            sleep 2
+          done
+
+          if [ "$run_id" = "0" ] || [ "$run_id" = "$before_run" ]; then
+            echo "Unable to locate the dispatched build run" >&2
+            exit 1
+          fi
+
+          if ! gh run watch "$run_id" --repo "${{ github.repository }}" --exit-status; then
+            gh run view "$run_id" \
+              --repo "${{ github.repository }}" \
+              --log-failed > .github/last-build-failure.log
+            git config user.name github-actions
+            git config user.email github-actions@github.com
+            git add .github/last-build-failure.log
+            git commit -m "Save OnePlus Ace 5 build failure log"
+            git push
+            exit 1
+          fi
