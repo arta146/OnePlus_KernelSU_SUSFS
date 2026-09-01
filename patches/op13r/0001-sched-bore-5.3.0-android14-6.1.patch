@@ -502,7 +502,7 @@ index c5f5e0f6b..240f128a0 100644
  	curr->vruntime += calc_delta_fair(delta_exec, curr);
  	update_min_vruntime(cfs_rq);
  
-@@ -6254,6 +6407,14 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
+@@ -6254,3 +6407,11 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
  	bool was_sched_idle = sched_idle_rq(rq);
  
  	util_est_dequeue(&rq->cfs, p);
@@ -514,9 +514,6 @@ index c5f5e0f6b..240f128a0 100644
 +		restart_burst(se);
 +	}
 +#endif
- 
- 	for_each_sched_entity(se) {
- 		cfs_rq = cfs_rq_of(se);
 @@ -8069,24 +8230,32 @@ static void yield_task_fair(struct rq *rq)
  	/*
  	 * Are we the only task in the tree?

@@ -39,7 +39,7 @@ jobs:
             -f ksu_options='[{"type":"ksun","hash":"dev-susfs"}]' \
             -f optimize_level=O2 \
             -f clean_build=false \
-            -f debug=true \
+            -f debug=false \
             -f mirror_toolchains=false
 
           run_id=0
