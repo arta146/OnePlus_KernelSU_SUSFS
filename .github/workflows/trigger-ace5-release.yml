@@ -1,0 +1,31 @@
+name: Trigger OnePlus Ace 5 Release Build
+
+permissions:
+  actions: write
+  contents: read
+
+on:
+  push:
+    branches:
+      - OPAce5-6.1.141v1
+    paths:
+      - .github/workflows/trigger-ace5-release.yml
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start OnePlus Ace 5 build and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run build-kernel-release.yml \
+            --repo "${{ github.repository }}" \
+            --ref "${{ github.ref_name }}" \
+            -f make_release=true \
+            -f op_model='OnePlus Ace 5' \
+            -f ksu_options='[{"type":"ksun","hash":"dev-susfs"}]' \
+            -f optimize_level=O2 \
+            -f clean_build=false \
+            -f debug=false \
+            -f mirror_toolchains=false
