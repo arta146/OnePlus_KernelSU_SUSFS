@@ -105,6 +105,26 @@ runs:
         path: action-source
         fetch-depth: 1
 
+    - name: 🔍 Debug action-source
+      shell: bash
+      run: |
+       set -euo pipefail
+
+        echo "ACTION_REPO=$ACTION_REPO"
+        echo "ACTION_REF=$ACTION_REF"
+
+        echo "=== action-source HEAD ==="
+        git -C action-source rev-parse HEAD
+
+        echo "=== action-source remote ==="
+        git -C action-source remote -v
+
+        echo "=== cache/save ==="
+        sed -n '1,240p' action-source/.github/actions/cache/save/action.yml
+
+        echo "=== cache/restore ==="
+        sed -n '1,240p' action-source/.github/actions/cache/restore/action.yml     
+
     - name: Parse op_config_json
       shell: bash
       run: |
