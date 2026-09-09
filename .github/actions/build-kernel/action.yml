@@ -123,7 +123,15 @@ runs:
         sed -n '1,240p' action-source/.github/actions/cache/save/action.yml
 
         echo "=== cache/restore ==="
-        sed -n '1,240p' action-source/.github/actions/cache/restore/action.yml     
+        sed -n '1,240p' action-source/.github/actions/cache/restore/action.yml  
+
+        echo "=== build-kernel action.yml ==="
+        grep -n "pershoot\|0001-\|0002-\|retry_fetch_archive" \
+        .github/actions/build-kernel/action.yml || true
+
+        echo "=== action-source build-kernel ==="
+         grep -n "pershoot\|0001-\|0002-\|retry_fetch_archive" \
+        action-source/.github/actions/build-kernel/action.yml || true   
 
     - name: Parse op_config_json
       shell: bash
