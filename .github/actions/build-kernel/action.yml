@@ -905,10 +905,35 @@ runs:
         cd "$KERNEL_PLATFORM_FOLDER"
         echo "Adding KernelSU Next..."
         KSU_INPUT="${{ inputs.ksu_branch_or_hash }}"
+        KSU_REPO="https://github.com/pershoot/KernelSU-Next.git"
+
         if [ -z "$KSU_INPUT" ]; then
-          curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -
+        KSU_INPUT="dev-susfs"  
+        fi
+
+        echo "Using Pershoot KernelSU-Next"
+        echo "Repository: $KSU_REPO"
+        echo "Ref: $KSU_INPUT"
+
+        if git ls-remote --heads "$KSU_REPO" "$KSU_INPUT" | grep -q .; then
+        echo "Using KernelSU-Next branch: $KSU_INPUT"
+
+        curl --fail --location --proto '=https' -LSs \
+        "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" \
+         | bash -s dev-susfs
+
+        git -C KernelSU-Next/kernel fetch --depth=50 origin "$KSU_INPUT"
+         git -C KernelSU-Next/kernel checkout "origin/$KSU_INPUT"
+
         else
-          curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s "$KSU_INPUT"
+         echo "Using KernelSU-Next commit: $KSU_INPUT"
+
+         curl --fail --location --proto '=https' -LSs \
+         "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" \
+        | bash -s dev-susfs
+
+         git -C KernelSU-Next/kernel fetch --depth=50 origin "$KSU_INPUT"
+         git -C KernelSU-Next/kernel checkout "$KSU_INPUT"
         fi
         git submodule update --init --recursive
         cd KernelSU-Next/kernel
@@ -954,11 +979,11 @@ runs:
         echo "KSUN" >> "${ARTIFACTS_FOLDER}/${OP_MODEL}_${OP_OS_VERSION}.txt"
         echo "$KSU_VERSION" >> "${ARTIFACTS_FOLDER}/${OP_MODEL}_${OP_OS_VERSION}.txt"
         echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-        echo "KernelSU Next Version: $KSU_VERSION"
+           echo "KernelSU Next Version: $KSU_VERSION"
         echo "✅ KernelSU Next added (commit: ${KSU_COMMIT_SHA:0:8})"
-        echo "::endgroup::"
+         echo "::endgroup::"
 
-    - name: Add KernelSU
+         - name: Add KernelSU
       shell: bash
       if: ${{ inputs.ksu_type == 'KSU' }}
       run: |
