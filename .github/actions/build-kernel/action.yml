@@ -124,15 +124,7 @@ runs:
 
         echo "=== cache/restore ==="
         sed -n '1,240p' action-source/.github/actions/cache/restore/action.yml  
-
-        echo "=== build-kernel action.yml ==="
-        grep -n "pershoot\|0001-\|0002-\|retry_fetch_archive" \
-        .github/actions/build-kernel/action.yml || true
-
-        echo "=== action-source build-kernel ==="
-         grep -n "pershoot\|0001-\|0002-\|retry_fetch_archive" \
-        action-source/.github/actions/build-kernel/action.yml || true   
-
+        
     - name: Parse op_config_json
       shell: bash
       run: |
@@ -915,33 +907,16 @@ runs:
         KSU_INPUT="${{ inputs.ksu_branch_or_hash }}"
         KSU_REPO="https://github.com/pershoot/KernelSU-Next.git"
 
-        if [ -z "$KSU_INPUT" ]; then
-        KSU_INPUT="dev-susfs"  
-        fi
-
-        echo "Using Pershoot KernelSU-Next"
-        echo "Repository: $KSU_REPO"
-        echo "Ref: $KSU_INPUT"
-
-        if git ls-remote --heads "$KSU_REPO" "$KSU_INPUT" | grep -q .; then
-        echo "Using KernelSU-Next branch: $KSU_INPUT"
+        if [ -z "$KSU_INPUT" ]; then        
 
         curl --fail --location --proto '=https' -LSs \
         "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" \
          | bash -s dev-susfs
 
-        git -C KernelSU-Next/kernel fetch --depth=50 origin "$KSU_INPUT"
-         git -C KernelSU-Next/kernel checkout "origin/$KSU_INPUT"
-
         else
-         echo "Using KernelSU-Next commit: $KSU_INPUT"
-
          curl --fail --location --proto '=https' -LSs \
          "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" \
         | bash -s dev-susfs
-
-         git -C KernelSU-Next/kernel fetch --depth=50 origin "$KSU_INPUT"
-         git -C KernelSU-Next/kernel checkout "$KSU_INPUT"
         fi
         git submodule update --init --recursive
         cd KernelSU-Next/kernel
