@@ -790,7 +790,6 @@ runs:
             SUSFS_BRANCH="$SUSFS_INPUT"
             echo "🔧 Using resolved SUSFS ref: $SUSFS_BRANCH"
           fi
-        fi
         
         retry_fetch_archive() {
           local url="$1"
@@ -884,51 +883,56 @@ runs:
 
         
         
-        if ! retry_fetch_archive "https://gitlab.com/simonpunk/susfs4ksu.git" "$SUSFS_BRANCH"; then
-          echo "Archive download failed; falling back to git clone..."
+                # Fetch SUSFS as a Git repository so compatibility commits can be applied.
+        rm -rf "$SUSFS_FOLDER"
 
-        rm -rf susfs4ksu
-
-          if ! git clone --no-checkout \
-              https://gitlab.com/simonpunk/susfs4ksu.git susfs4ksu; then
-            echo "::error::Failed to clone SUSFS repository"
+        if ! git clone --no-checkout \
+            https://gitlab.com/simonpunk/susfs4ksu.git \
+            "$SUSFS_FOLDER"; then
+          echo "::error::Failed to clone SUSFS repository"
           exit 1
         fi
 
-        if ! git -C susfs4ksu checkout --detach "$SUSFS_BRANCH"; then
-        echo "::error::Failed to checkout SUSFS ref: $SUSFS_BRANCH"
-        exit 1
+        if ! git -C "$SUSFS_FOLDER" checkout --detach "$SUSFS_BRANCH"; then
+          echo "::error::Failed to checkout SUSFS ref: $SUSFS_BRANCH"
+          exit 1
         fi
 
-        echo "SUSFS checked out successfully at $SUSFS_BRANCH"
-        fi
+        SUSFS_BASE_SHA=$(git -C "$SUSFS_FOLDER" rev-parse HEAD)
+        echo "SUSFS_COMMIT_SHA=$SUSFS_BASE_SHA" >> "$GITHUB_ENV"
+        echo "SUSFS checked out at $SUSFS_BASE_SHA"
 
-          echo "SUSFS_COMMIT_SHA=$SUSFS_BRANCH" >> $GITHUB_ENV
+        if [ "${{ inputs.ksu_type }}" = "KSUN" ]; then
+          echo "Applying Pershoot SUSFS compatibility commits..."
 
-          if [ "${{ inputs.ksu_type }}" = "KSUN" ]; then
-            echo "Checking SUSFS compatibility patches..."
-
-        cd "$SUSFS_FOLDER"
-
-         if [ -f "$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0001-pershoot-Allow-core-to-be-built-with-no-features.patch" ]; then 
-         echo "Applying pershoot patch 0001"
-         patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0001-pershoot-Allow-core-to-be-built-with-no-features.patch"
-         else
-         echo "pershoot patch 0001 not found, skipping"
-        fi
-
-        if [ -f "$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0002-pershoot-Implement-SuSFS-and-Toolkit-coexistence.patch" ]; then
-         echo "Applying pershoot patch 0002"
-         patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0002-pershoot-Implement-SuSFS-and-Toolkit-coexistence.patch"
-        else
-        echo "pershoot patch 0002 not found, skipping"
-        fi
-
-        cd "$GITHUB_WORKSPACE"
-
-        echo "✅ SUSFS compatibility patch stage completed"
-
+          if ! git -C "$SUSFS_FOLDER" fetch --no-tags \
+              https://gitlab.com/pershoot/susfs4ksu.git \
+              gki-android14-6.1-dev; then
+            echo "::error::Failed to fetch Pershoot compatibility branch"
+            exit 1
           fi
+
+          mapfile -t PERSHOOT_COMMITS < <(
+            git -C "$SUSFS_FOLDER" log \
+              --format='%H' -n 2 HEAD..FETCH_HEAD | tac
+          )
+
+          if [ "${#PERSHOOT_COMMITS[@]}" -ne 2 ]; then
+            echo "::error::Expected 2 Pershoot commits, found ${#PERSHOOT_COMMITS[@]}"
+            exit 1
+          fi
+
+          for commit in "${PERSHOOT_COMMITS[@]}"; do
+            echo "Applying Pershoot commit: $commit"
+
+            if ! git -C "$SUSFS_FOLDER" cherry-pick "$commit"; then
+              echo "::error::Failed to cherry-pick Pershoot commit $commit"
+              git -C "$SUSFS_FOLDER" cherry-pick --abort || true
+              exit 1
+            fi
+          done
+
+          echo "Pershoot compatibility commits applied successfully"
         fi
         echo "✅ Dependencies cloned"
         echo "::endgroup::"
